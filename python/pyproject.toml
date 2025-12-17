@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "broadcastio"
+version = "0.2.0"
+description = "Provider-agnostic message broadcasting with fallback orchestration"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+
+authors = [
+  { name = "Naufal Hilmiaji" }
+]
+
+maintainers = [
+  { name = "Naufal Hilmiaji" }
+]
+
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+
+keywords = [
+  "messaging",
+  "notifications",
+  "orchestration",
+  "fallback",
+  "whatsapp",
+]
+
+[project.urls]
+Homepage = "https://github.com/naufalhilmiaji/broadcastio"
+Repository = "https://github.com/naufalhilmiaji/broadcastio"
+Issues = "https://github.com/naufalhilmiaji/broadcastio/issues"
+
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+
+[tool.setuptools.packages.find]
+where = ["python"]
