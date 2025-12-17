@@ -1,5 +1,9 @@
 # broadcastio
 
+[![PyPI](https://img.shields.io/pypi/v/broadcastio)](https://pypi.org/project/broadcastio/)
+![Python Versions](https://img.shields.io/pypi/pyversions/broadcastio)
+![CI](https://github.com/naufalhilmiaji/broadcastio/actions/workflows/ci.yml/badge.svg)
+
 **broadcastio** is a provider-agnostic Python library for **outbound message broadcasting with fallback orchestration**.
 
 It is designed for sending notifications, alerts, or reports reliably across one or more delivery providers, with clear failure semantics.
