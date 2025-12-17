@@ -37,6 +37,10 @@ keywords = [
   "whatsapp",
 ]
 
+dependencies = [
+  "requests>=2.31",
+]
+
 [project.urls]
 Homepage = "https://github.com/naufalhilmiaji/broadcastio"
 Repository = "https://github.com/naufalhilmiaji/broadcastio"
