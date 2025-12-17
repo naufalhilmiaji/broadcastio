@@ -8,11 +8,11 @@ It is designed for sending notifications, alerts, or reports reliably across one
 
 ## Features
 
-* 🚦 Ordered provider fallback
-* 📦 Attachment support
-* 🧩 Provider abstraction (WhatsApp, Email, etc.)
-* ⚠️ Clear error classification (exceptions vs delivery failures)
-* 🧪 Tested core logic
+- 🚦 Ordered provider fallback
+- 📦 Attachment support
+- 🧩 Provider abstraction (WhatsApp, Email, etc.)
+- ⚠️ Clear error classification (exceptions vs delivery failures)
+- 🧪 Tested core logic
 
 ---
 
@@ -20,15 +20,15 @@ It is designed for sending notifications, alerts, or reports reliably across one
 
 ### ✅ It is
 
-* A Python **orchestration layer** for outbound messages
-* A way to retry delivery across providers
-* A library that separates configuration errors from runtime failures
+- A Python **orchestration layer** for outbound messages
+- A way to retry delivery across providers
+- A library that separates configuration errors from runtime failures
 
 ### ❌ It is not
 
-* A chatbot framework
-* An inbound message handler
-* A WhatsApp automation tool by itself
+- A chatbot framework
+- An inbound message handler
+- A WhatsApp automation tool by itself
 
 ---
 
@@ -36,9 +36,15 @@ It is designed for sending notifications, alerts, or reports reliably across one
 
 ```bash
 pip install broadcastio
-```
+````
 
 Python ≥ 3.10 required.
+
+---
+
+> **Note:** Some providers (such as WhatsApp) require external services to be running.
+> The Quick Start example below assumes the WhatsApp Node.js service is already available.
+> See the *Providers* section for setup details.
 
 ---
 
@@ -49,6 +55,7 @@ from broadcastio.core.orchestrator import Orchestrator
 from broadcastio.providers.whatsapp import WhatsAppProvider
 from broadcastio.core.message import Message
 
+# Example using WhatsAppProvider (requires Node.js service)
 wa = WhatsAppProvider("http://localhost:3000")
 orch = Orchestrator([wa])
 
@@ -68,6 +75,7 @@ print(result)
 
 ```python
 from broadcastio.core.attachment import Attachment
+from broadcastio.core.message import Message
 
 msg = Message(
     recipient="6281234567890",
@@ -80,7 +88,9 @@ msg = Message(
 )
 ```
 
-`host_path` refers to the Python host filesystem, while `provider_path` refers to the provider runtime (e.g. Docker container).
+`host_path` refers to the Python host filesystem, while `provider_path` refers to the provider runtime (for example, a Docker container).
+
+Attachment paths are intentionally explicit to support containerized providers.
 
 ---
 
@@ -118,18 +128,115 @@ This makes fallback behavior explicit and predictable.
 
 ### WhatsApp Provider
 
-The WhatsApp provider relies on an **external Node.js sender service** (e.g. using `whatsapp-web.js`).
+`broadcastio` supports WhatsApp delivery via an **external Node.js service** based on WhatsApp Web.
+
+This service is **not included** in the Python package and must be run separately.
+The Python library communicates with it over HTTP.
+
+---
+
+#### Requirements
+
+* Node.js **18+**
+* Chrome / Chromium (used by Puppeteer)
+* A WhatsApp account for QR-based authentication
+
+---
+
+#### Running the WhatsApp service (Docker)
+
+The recommended way to run the WhatsApp service is via Docker.
+
+```bash
+git clone https://github.com/naufalhilmiaji/broadcastio.git
+cd broadcastio/node
+
+docker build -t broadcastio-whatsapp .
+docker run -p 3000:3000 \
+  -v $(pwd)/.wwebjs_auth:/app/.wwebjs_auth \
+  broadcastio-whatsapp
+```
+
+The service will be available at:
+
+```
+http://localhost:3000
+```
+
+---
+
+#### WhatsApp authentication
+
+On first startup, the service will display a QR code in the logs.
+
+* Scan the QR code using the WhatsApp mobile app
+* Authentication state is stored in `.wwebjs_auth/`
+* Subsequent restarts reuse the existing session
+
+If `.wwebjs_auth/` is removed, re-authentication will be required.
+
+---
+
+#### Service health check
+
+You can verify that the service is ready by calling:
+
+```bash
+curl http://localhost:3000/health
+```
+
+Expected response:
+
+```json
+{ "ready": true }
+```
+
+---
+
+#### Using WhatsAppProvider in Python
 
 ```python
+from broadcastio.core.orchestrator import Orchestrator
 from broadcastio.providers.whatsapp import WhatsAppProvider
+from broadcastio.providers.dummy import DummyProvider
+from broadcastio.core.message import Message
 
 wa = WhatsAppProvider("http://localhost:3000")
+fallback = DummyProvider()
+
+orch = Orchestrator([wa, fallback])
+
+orch.send(
+    Message(
+        recipient="6281234567890",
+        content="Hello from broadcastio"
+    )
+)
 ```
 
-If the service is unavailable, `broadcastio` returns:
+---
+
+#### Notes and limitations
+
+* The WhatsApp provider supports **outbound messaging only**
+* Inbound messages and chatbot behavior are intentionally out of scope
+* WhatsApp delivery relies on `whatsapp-web.js`, which is unofficial
+* This provider is best suited for automation, alerts, and internal tooling
+
+---
+
+#### Architecture overview
 
 ```
-DeliveryError(code="PROVIDER_UNAVAILABLE")
+Python application
+        ↓
+    broadcastio
+        ↓
+   HTTP request
+        ↓
+Node WhatsApp service
+        ↓
+   WhatsApp Web
 ```
 
 ---
@@ -139,8 +246,6 @@ DeliveryError(code="PROVIDER_UNAVAILABLE")
 * **Version:** 0.2.0
 * **Status:** Alpha
 * APIs may evolve until 1.0.0
-
-See the full documentation on GitHub for architecture details and Docker examples.
 
 ---
 
