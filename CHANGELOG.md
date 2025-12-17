@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 This project follows [Semantic Versioning](https://semver.org/).
 
 ---
+## [0.2.1] - 2025-01-xx
+
+### Fixed
+- Expose package version via `broadcastio.__version__`
+- Remove misplaced root-level `__init__.py`
+
+---
 
 ## [0.2.0] – 2025-12-16
 
