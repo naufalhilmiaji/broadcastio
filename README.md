@@ -143,9 +143,30 @@ The Python library communicates with it over HTTP.
 
 ---
 
-#### Running the WhatsApp service (Docker)
+#### Running the WhatsApp service (Docker Compose – recommended)
 
-The recommended way to run the WhatsApp service is via Docker.
+From the repository root:
+
+```bash
+git clone https://github.com/naufalhilmiaji/broadcastio.git
+cd broadcastio
+
+docker compose up
+```
+
+This will start the WhatsApp service on:
+
+```
+http://localhost:3000
+```
+
+Authentication state is persisted under `node/.wwebjs_auth/`.
+
+---
+
+#### Running the WhatsApp service (manual Docker build)
+
+This section describes a manual Docker build as an alternative to Docker Compose.
 
 ```bash
 git clone https://github.com/naufalhilmiaji/broadcastio.git
@@ -167,7 +188,8 @@ http://localhost:3000
 
 #### WhatsApp authentication
 
-On first startup, the service will display a QR code in the logs.
+On first startup, the service will generate a QR code for authentication.
+Depending on configuration, this may be written to a file or printed in logs.
 
 * Scan the QR code using the WhatsApp mobile app
 * Authentication state is stored in `.wwebjs_auth/`
@@ -188,7 +210,11 @@ curl http://localhost:3000/health
 Expected response:
 
 ```json
-{ "ready": true }
+{
+  "provider": "whatsapp",
+  "ready": true,
+  "timestamp": "2025-12-17T06:34:44.198Z"
+}
 ```
 
 ---
@@ -245,7 +271,7 @@ Node WhatsApp service
 
 * **Version:** 0.2.0
 * **Status:** Alpha
-* APIs may evolve until 1.0.0
+* Public APIs may evolve until version 1.0.0
 
 ---
 
