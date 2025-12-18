@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from typing import Callable, List, Optional, Union, Dict, Tuple
 
 import requests
@@ -71,7 +71,7 @@ class Orchestrator:
                     )
 
     def _get_provider_health(self, provider: MessageProvider) -> ProviderHealth:
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
 
         if self.health_ttl is not None:
             cached = self._health_cache.get(provider.name)
@@ -124,7 +124,7 @@ class Orchestrator:
             else:
                 # Record skipped provider in trace
                 if trace:
-                    now = datetime.now(UTC)
+                    now = datetime.now(timezone.utc)
                     attempts.append(
                         DeliveryAttempt(
                             provider=provider.name,
@@ -145,7 +145,7 @@ class Orchestrator:
         providers_to_try = healthy_providers or self.providers
 
         for provider in providers_to_try:
-            started_at = datetime.now(UTC)
+            started_at = datetime.now(timezone.utc)
 
             try:
                 result = provider.send(message)
@@ -177,7 +177,7 @@ class Orchestrator:
                     ),
                 )
 
-            finished_at = datetime.now(UTC)
+            finished_at = datetime.now(timezone.utc)
 
             # Record attempt
             attempt = DeliveryAttempt(

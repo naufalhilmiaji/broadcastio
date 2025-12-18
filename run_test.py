@@ -50,7 +50,7 @@ orch = Orchestrator(
 
 
 # msg = Message(
-#     recipient="6281285244060",
+#     recipient="628123456789",
 #     content="Hello from broadcastio (health-aware)",
 # )
 
@@ -85,7 +85,7 @@ orch = Orchestrator(
 # )
 
 # msg_with_bad_attachment = Message(
-#     recipient="6281285244060",
+#     recipient="628123456789",
 #     content="This should fail before sending",
 #     attachment=bad_attachment,
 # )
@@ -111,7 +111,7 @@ orch_strict = Orchestrator(
 )
 
 msg_strict = Message(
-    recipient="6281285244060",
+    recipient="628123456789",
     content="Strict health check test",
 )
 
@@ -131,7 +131,7 @@ except BroadcastioError as exc:
 print("\n=== Scenario 4: Logical provider failure ===")
 
 msg_logical_fail = Message(
-    recipient="6281285244060",
+    recipient="628123456789",
     content="Trigger logical failure",
     metadata=MessageMetadata(reference_id="FORCE_LOGICAL_FAIL"),
 )
