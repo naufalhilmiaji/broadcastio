@@ -2,7 +2,7 @@ const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode");
 const logger = require("../utils/logger");
 
-const filepath = "./wa_authentication.png"
+const filepath = "./qr/wa_authentication.png"
 
 const client = new Client({
     authStrategy: new LocalAuth(),

@@ -13,6 +13,26 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.0a1] – 2025-XX-XX
+
+### Added
+- Health-aware orchestration with provider skipping
+- DeliveryTrace for detailed delivery inspection
+- Observability hooks (`on_attempt`, `on_success`, `on_failure`)
+- Strict health mode (`require_healthy`)
+- Health caching with configurable TTL
+
+### Changed
+- Orchestrator now supports optional tracing and hooks
+- Provider unavailability is normalized consistently
+- (Minor) Changed QR path to `./node/qr/wa_authentication.png`
+
+### Notes
+- This is an **alpha release**
+- APIs may evolve before 1.0.0
+
+---
+
 ## [0.2.0] – 2025-12-16
 
 ### Added
