@@ -25,7 +25,7 @@ It is designed for sending notifications, alerts, or reports reliably across one
 ### ✅ It is
 
 - A Python **orchestration layer** for outbound messages
-- A way to retry delivery across providers
+- A way to attempt delivery across multiple providers
 - A library that separates configuration errors from runtime failures
 
 ### ❌ It is not
@@ -115,7 +115,7 @@ except BroadcastioError as exc:
     print(exc.code, str(exc))
 ```
 
-### DeliveryResult
+### Delivery results
 
 Returned when delivery was attempted:
 
@@ -125,6 +125,34 @@ if not result.success:
 ```
 
 This makes fallback behavior explicit and predictable.
+
+---
+
+## Observability Hooks
+
+`broadcastio` exposes optional hooks that allow users to observe delivery behavior
+without affecting orchestration flow.
+
+Available hooks:
+
+* `on_attempt(attempt: DeliveryAttempt)`
+* `on_success(result: DeliveryResult)`
+* `on_failure(result: DeliveryResult)`
+
+Hooks are synchronous, optional, and safe by default.
+Exceptions raised inside hooks are ignored.
+
+Example:
+
+```python
+def log_attempt(attempt):
+    print(attempt.provider, attempt.success)
+
+orch = Orchestrator(
+    [wa],
+    on_attempt=log_attempt,
+)
+```
 
 ---
 
@@ -192,8 +220,9 @@ http://localhost:3000
 
 #### WhatsApp authentication
 
-On first startup, the service will generate a QR code for authentication.
-Depending on configuration, this may be written to a file or printed in logs.
+On first startup, the service generates a QR code for authentication.
+By default, the QR image is written under `node/qr/`, but it may also be printed
+in logs depending on configuration.
 
 * Scan the QR code using the WhatsApp mobile app
 * Authentication state is stored in `.wwebjs_auth/`
@@ -273,7 +302,7 @@ Node WhatsApp service
 
 ## Project Status
 
-* **Version:** 0.2.0
+* **Version:** 0.3.0a1
 * **Status:** Alpha
 * Public APIs may evolve until version 1.0.0
 
