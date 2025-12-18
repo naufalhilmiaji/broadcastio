@@ -68,7 +68,7 @@ orch = Orchestrator(
 # except BroadcastioError as exc:
 #     logger.error(
 #         "Broadcastio configuration error",
-#         extra={"code": exc.code, "message": str(exc)},
+#         extra={"code": exc.code, "err_message": str(exc)},
 #     )
 
 
@@ -95,7 +95,7 @@ orch = Orchestrator(
 # except BroadcastioError as exc:
 #     logger.error(
 #         "Expected attachment validation error",
-#         extra={"code": exc.code, "message": str(exc)},
+#         extra={"code": exc.code, "err_message": str(exc)},
 #     )
 
 
@@ -120,7 +120,7 @@ try:
 except BroadcastioError as exc:
     logger.error(
         "Strict health orchestration error",
-        extra={"code": exc.code, "message": str(exc)},
+        extra={"code": exc.code, "err_message": str(exc)},
     )
 
 
@@ -148,7 +148,7 @@ try:
 except BroadcastioError as exc:
     logger.error(
         "Unexpected broadcastio error",
-        extra={"code": exc.code, "message": str(exc)},
+        extra={"code": exc.code, "err_message": str(exc)},
     )
 
 
