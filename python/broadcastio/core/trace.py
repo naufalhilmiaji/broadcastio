@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Optional
 
 from broadcastio.core.result import DeliveryError, DeliveryResult
@@ -11,8 +11,8 @@ class DeliveryAttempt:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     provider: str = ""
     success: bool = False
-    started_at: datetime = field(default_factory=datetime.utcnow)
-    finished_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    finished_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     error: Optional[DeliveryError] = None
 
     @property
@@ -36,7 +36,7 @@ class DeliveryTrace:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     attempts: List[DeliveryAttempt] = field(default_factory=list)
     final: DeliveryResult = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict:
         return {
