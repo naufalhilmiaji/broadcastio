@@ -5,15 +5,27 @@ All notable changes to this project will be documented in this file.
 This project follows [Semantic Versioning](https://semver.org/).
 
 ---
-## [0.2.1] - 2025-01-xx
+## [0.3.0a2] – 2025-12-21
+
+### Changed
+- Stabilized `RetryPolicy` behavior and retry execution flow
+- Finalized `DeliveryTrace` structure, timestamps, and serialization
+- Improved health-aware orchestration consistency
+- Normalized provider-unavailable error handling
+- Aligned tests, documentation, and runtime behavior
 
 ### Fixed
-- Expose package version via `broadcastio.__version__`
-- Remove misplaced root-level `__init__.py`
+- CI failures related to timezone handling and logging
+- Edge cases in orchestration fallback and health checks
+- Minor internal correctness and cleanup issues
 
----
+### Notes
+- This is an **alpha release**
+- APIs may continue to evolve before `1.0.0`
+- No new features introduced compared to `0.3.0a1`
 
-## [0.3.0a1] – 2025-XX-XX
+
+## [0.3.0a1] – 2025-12-18
 
 ### Added
 - Health-aware orchestration with provider skipping
@@ -30,6 +42,13 @@ This project follows [Semantic Versioning](https://semver.org/).
 ### Notes
 - This is an **alpha release**
 - APIs may evolve before 1.0.0
+
+---
+## [0.2.1] - 2025-12-17
+
+### Fixed
+- Expose package version via `broadcastio.__version__`
+- Remove misplaced root-level `__init__.py`
 
 ---
 

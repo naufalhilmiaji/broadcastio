@@ -1,8 +1,10 @@
 import uuid
+import warnings
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 from broadcastio.core.attachment import Attachment
+from broadcastio.core.exceptions import ValidationError
 
 
 @dataclass
@@ -45,6 +47,14 @@ class Message:
                     for k, v in self.metadata.items()
                     if k not in {"priority", "reference_id", "tags"}
                 },
+            )
+        elif not isinstance(self.recipient, str) or not self.recipient.strip():
+            raise ValidationError("recipient must be a non-empty string")
+        elif self.recipient.isdigit() and len(self.recipient) > 10:
+            warnings.warn(
+                "Recipient looks like a phone number. "
+                "Avoid hardcoding real phone numbers in source code.",
+                UserWarning,
             )
         else:
             raise TypeError("metadata must be MessageMetadata, dict, or None")

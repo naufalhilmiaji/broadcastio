@@ -1,27 +1,17 @@
 from dataclasses import dataclass
 from typing import Optional
 
-
-@dataclass
-class DeliveryError:
-    code: str
-    message: str
-    details: dict | None = None
-
-    def to_dict(self) -> dict:
-        return {
-            "code": self.code,
-            "message": self.message,
-            "details": self.details,
-        }
+from broadcastio.core.errors import DeliveryError
+from broadcastio.core.trace import DeliveryTrace
 
 
 @dataclass
 class DeliveryResult:
     success: bool
     provider: str
-    message_id: str | None = None
-    error: DeliveryError | None = None
+    message_id: Optional[str] = None
+    error: Optional[DeliveryError] = None
+    trace: Optional[DeliveryTrace] = None
 
     def to_dict(self) -> dict:
         return {
@@ -29,4 +19,5 @@ class DeliveryResult:
             "provider": self.provider,
             "message_id": self.message_id,
             "error": self.error.to_dict() if self.error else None,
+            "trace": self.trace.to_dict() if self.trace else None,
         }

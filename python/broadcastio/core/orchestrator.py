@@ -1,46 +1,56 @@
 import os
-from datetime import datetime, timedelta, timezone
-from typing import Callable, List, Optional, Union, Dict, Tuple
-
+import time
 import requests
+from datetime import datetime, timedelta, timezone
+from typing import Callable, Dict, List, Optional, Tuple
 
 from broadcastio.core.exceptions import (
     AttachmentError,
     BroadcastioError,
-    OrchestrationError,
     ErrorCode,
+    OrchestrationError,
     ValidationError,
 )
-from broadcastio.core.message import Message
-from broadcastio.core.result import DeliveryResult, DeliveryError
-from broadcastio.core.trace import DeliveryAttempt, DeliveryTrace
 from broadcastio.core.health import ProviderHealth
+from broadcastio.core.message import Message
+from broadcastio.core.result import DeliveryError, DeliveryResult
+from broadcastio.core.retry import RetryPolicy
+from broadcastio.core.trace import DeliveryAttempt, DeliveryTrace
 from broadcastio.providers.base import MessageProvider
 
 
 class Orchestrator:
     """
-    Coordinates message delivery across multiple providers,
-    with optional health-aware routing and delivery tracing.
+    Coordinates outbound message delivery across providers.
+
+    Responsibilities:
+    - Message validation
+    - Health-aware provider selection
+    - Retry orchestration (per provider)
+    - Fallback routing
+    - Delivery tracing
+    - Observability hooks
     """
 
     def __init__(
         self,
         providers: List[MessageProvider],
         *,
+        retry_policy: Optional[RetryPolicy] = None,
         health_ttl: Optional[int] = 30,
         require_healthy: bool = False,
-        on_attempt: Optional[Callable] = None,
-        on_success: Optional[Callable] = None,
-        on_failure: Optional[Callable] = None,
+        on_attempt: Optional[Callable[[DeliveryAttempt], None]] = None,
+        on_success: Optional[Callable[[DeliveryResult], None]] = None,
+        on_failure: Optional[Callable[[DeliveryResult], None]] = None,
     ):
-
         if not providers:
             raise OrchestrationError("Orchestrator requires at least one provider")
 
         self.providers = providers
+        self.retry_policy = retry_policy or RetryPolicy()
         self.health_ttl = health_ttl
         self.require_healthy = require_healthy
+
         self.on_attempt = on_attempt
         self.on_success = on_success
         self.on_failure = on_failure
@@ -56,19 +66,13 @@ class Orchestrator:
             raise ValidationError("Message must have content or an attachment")
 
         if message.attachment:
-            # Host-side validation
             if not os.path.isfile(message.attachment.host_path):
                 raise AttachmentError(
                     f"Attachment not found: {message.attachment.host_path}"
                 )
 
-            # Provider-path sanity check
-            if message.attachment.provider_path.startswith("/"):
-                provider_dir = os.path.dirname(message.attachment.provider_path)
-                if not provider_dir:
-                    raise AttachmentError(
-                        f"Invalid provider_path: {message.attachment.provider_path}"
-                    )
+            if not message.attachment.provider_path:
+                raise AttachmentError("Attachment provider_path is required")
 
     def _get_provider_health(self, provider: MessageProvider) -> ProviderHealth:
         now = datetime.now(timezone.utc)
@@ -84,135 +88,136 @@ class Orchestrator:
         self._health_cache[provider.name] = (now, health)
         return health
 
-    def _safe_call_hook(self, hook, arg) -> None:
+    def _iter_providers(self) -> List[MessageProvider]:
+        healthy = []
+        unhealthy = []
+
+        for provider in self.providers:
+            health = self._get_provider_health(provider)
+            if health.ready:
+                healthy.append(provider)
+            else:
+                unhealthy.append(provider)
+
+        if self.require_healthy and not healthy:
+            raise OrchestrationError("No healthy providers available")
+
+        return healthy or self.providers
+
+    def _safe_call_hook(self, hook, payload) -> None:
         if not hook:
             return
         try:
-            hook(arg)
+            hook(payload)
         except Exception:
             # Hooks must NEVER affect orchestration
             pass
 
-    def send(
-        self,
-        message: Message,
-        *,
-        trace: bool = False,
-    ) -> Union[DeliveryResult, DeliveryTrace]:
-        """
-        Send a message using the configured providers.
+    def _sleep_before_retry(self, policy: RetryPolicy, attempt_index: int) -> None:
+        if policy.backoff == "none":
+            return
 
-        Args:
-            message: Message to deliver
-            trace: If True, return DeliveryTrace instead of DeliveryResult
+        delay = policy.base_delay
+        if policy.backoff == "exponential":
+            delay = delay * (2**attempt_index)
 
-        Returns:
-            DeliveryResult or DeliveryTrace
-        """
+        if policy.max_delay is not None:
+            delay = min(delay, policy.max_delay)
+
+        if delay > 0:
+            time.sleep(delay)
+
+    def send(self, message: Message, *, trace: bool = False):
         self._validate_message(message)
 
-        attempts: List[DeliveryAttempt] = []
+        delivery_trace = DeliveryTrace() if trace else None
         last_error: Optional[DeliveryError] = None
 
-        healthy_providers: List[MessageProvider] = []
+        for provider in self._iter_providers():
+            policy = getattr(provider, "retry_policy", None) or self.retry_policy
 
-        for provider in self.providers:
-            health = self._get_provider_health(provider)
+            for attempt_index in range(policy.max_attempts):
+                started_at = datetime.now(timezone.utc)
 
-            if health.ready:
-                healthy_providers.append(provider)
-            else:
-                # Record skipped provider in trace
-                if trace:
-                    now = datetime.now(timezone.utc)
-                    attempts.append(
-                        DeliveryAttempt(
-                            provider=provider.name,
-                            success=False,
-                            started_at=now,
-                            finished_at=now,
-                            error=DeliveryError(
-                                code=ErrorCode.PROVIDER_UNAVAILABLE,
-                                message="Provider reported unhealthy",
-                                details={"health": health.details},
-                            ),
-                        )
+                try:
+                    result = provider.send(message)
+
+                except BroadcastioError:
+                    # Configuration / misuse → stop immediately
+                    raise
+
+                except requests.RequestException as exc:
+                    result = DeliveryResult(
+                        success=False,
+                        provider=provider.name,
+                        error=DeliveryError(
+                            code=ErrorCode.PROVIDER_UNAVAILABLE,
+                            message=f"{provider.name} service unavailable",
+                            details={"exception": str(exc)},
+                        ),
                     )
 
-        if self.require_healthy and not healthy_providers:
-            raise OrchestrationError("No healthy providers available")
+                except Exception as exc:
+                    result = DeliveryResult(
+                        success=False,
+                        provider=provider.name,
+                        error=DeliveryError(
+                            code=ErrorCode.ALL_PROVIDERS_FAILED,
+                            message=str(exc),
+                        ),
+                    )
 
-        providers_to_try = healthy_providers or self.providers
+                finished_at = datetime.now(timezone.utc)
 
-        for provider in providers_to_try:
-            started_at = datetime.now(timezone.utc)
-
-            try:
-                result = provider.send(message)
-
-            except BroadcastioError:
-                # Misuse / configuration error → never fallback
-                raise
-
-            except requests.RequestException as exc:
-                # Provider runtime unavailable (Node down, timeout, etc.)
-                result = DeliveryResult(
-                    success=False,
+                attempt = DeliveryAttempt(
                     provider=provider.name,
-                    error=DeliveryError(
-                        code=ErrorCode.PROVIDER_UNAVAILABLE,
-                        message=f"{provider.name} service unavailable",
-                        details={"exception": str(exc)},
-                    ),
+                    attempt=attempt_index + 1,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    success=result.success,
+                    error=result.error,
                 )
 
-            except Exception as exc:
-                # Unexpected crash inside provider
-                result = DeliveryResult(
-                    success=False,
-                    provider=provider.name,
-                    error=DeliveryError(
-                        code=ErrorCode.ALL_PROVIDERS_FAILED,
-                        message=str(exc),
-                    ),
-                )
+                if delivery_trace:
+                    delivery_trace.add_attempt(attempt)
 
-            finished_at = datetime.now(timezone.utc)
+                self._safe_call_hook(self.on_attempt, attempt)
 
-            # Record attempt
-            attempt = DeliveryAttempt(
-                provider=provider.name,
-                success=result.success,
-                started_at=started_at,
-                finished_at=finished_at,
-                error=result.error,
-            )
+                if result.success:
+                    if delivery_trace:
+                        delivery_trace.mark_finished(success=True)
+                        result.trace = delivery_trace
 
-            attempts.append(attempt)
+                    self._safe_call_hook(self.on_success, result)
+                    return result
 
-            self._safe_call_hook(self.on_attempt, attempt)
+                last_error = result.error
 
-            if result.success:
-                if trace:
-                    return DeliveryTrace(attempts=attempts, final=result)
-                return result
+                if (
+                    attempt_index + 1 < policy.max_attempts
+                    and last_error
+                    and policy.should_retry(last_error.code)
+                ):
+                    self._sleep_before_retry(policy, attempt_index)
+                    continue
 
-            last_error = result.error
+                break  # stop retrying this provider
+
+        final_error = last_error or DeliveryError(
+            code=ErrorCode.ALL_PROVIDERS_FAILED,
+            message="All providers failed",
+        )
 
         final_result = DeliveryResult(
             success=False,
             provider="none",
-            error=(
-                last_error
-                if isinstance(last_error, DeliveryError)
-                else DeliveryError(
-                    code=ErrorCode.ALL_PROVIDERS_FAILED,
-                    message=str(last_error) if last_error else "All providers failed",
-                )
-            ),
+            error=final_error,
         )
 
-        if trace:
-            return DeliveryTrace(attempts=attempts, final=final_result)
+        if delivery_trace:
+            delivery_trace.mark_finished(success=False)
+            final_result.trace = delivery_trace
+
+        self._safe_call_hook(self.on_failure, final_result)
 
         return final_result
