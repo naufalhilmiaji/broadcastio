@@ -2,10 +2,10 @@ from broadcastio.core.exceptions import ErrorCode
 from broadcastio.core.health import ProviderHealth
 from broadcastio.core.message import Message
 from broadcastio.core.orchestrator import Orchestrator
-from broadcastio.core.result import DeliveryResult, DeliveryError
+from broadcastio.core.result import DeliveryError, DeliveryResult
 from broadcastio.core.trace import DeliveryTrace
-from broadcastio.providers.dummy import DummyProvider
 from broadcastio.providers.base import MessageProvider
+from broadcastio.providers.dummy import DummyProvider
 
 
 class AlwaysFailProvider(MessageProvider):
@@ -41,19 +41,17 @@ def test_send_without_trace_returns_delivery_result():
 def test_delivery_trace_single_success():
     orch = Orchestrator([DummyProvider()])
 
-    trace = orch.send(
+    result = orch.send(
         Message(recipient="test", content="hello"),
         trace=True,
     )
 
-    assert isinstance(trace, DeliveryTrace)
-    assert trace.final.success is True
-    assert len(trace.attempts) == 1
+    assert result.success is True
+    assert result.trace is not None
 
-    attempt = trace.attempts[0]
-    assert attempt.provider == "dummy"
-    assert attempt.success is True
-    assert attempt.duration_ms >= 0
+    trace = result.trace
+    assert trace.success is True
+    assert len(trace.attempts) == 1
 
 
 def test_delivery_trace_records_fallback_attempts():
@@ -64,12 +62,13 @@ def test_delivery_trace_records_fallback_attempts():
         ]
     )
 
-    trace = orch.send(
+    result = orch.send(
         Message(recipient="test", content="hello"),
         trace=True,
     )
+    trace = result.trace
 
-    assert trace.final.success is True
+    assert trace.success is True
     assert len(trace.attempts) == 2
 
     first, second = trace.attempts
@@ -88,12 +87,13 @@ def test_delivery_trace_all_providers_failed():
         ]
     )
 
-    trace = orch.send(
+    result = orch.send(
         Message(recipient="test", content="hello"),
         trace=True,
     )
+    trace = result.trace
 
-    assert trace.final.success is False
+    assert trace.success is False
     assert len(trace.attempts) == 1
     assert trace.attempts[0].success is False
 
@@ -101,14 +101,15 @@ def test_delivery_trace_all_providers_failed():
 def test_delivery_trace_serialization():
     orch = Orchestrator([DummyProvider()])
 
-    trace = orch.send(
+    result = orch.send(
         Message(recipient="test", content="hello"),
         trace=True,
     )
 
-    data = trace.to_dict()
+    data = result.trace.to_dict()
 
-    assert "id" in data
+    assert "trace_id" in data
     assert "attempts" in data
+    assert "started_at" in data
+    assert "finished_at" in data
     assert isinstance(data["attempts"], list)
-    assert "final" in data

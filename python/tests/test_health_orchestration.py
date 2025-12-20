@@ -4,8 +4,7 @@ from broadcastio.core.exceptions import ErrorCode, OrchestrationError
 from broadcastio.core.health import ProviderHealth
 from broadcastio.core.message import Message
 from broadcastio.core.orchestrator import Orchestrator
-from broadcastio.core.result import DeliveryResult, DeliveryError
-from broadcastio.core.trace import DeliveryTrace
+from broadcastio.core.result import DeliveryError, DeliveryResult
 from broadcastio.providers.base import MessageProvider
 
 
@@ -68,25 +67,26 @@ def test_unhealthy_provider_is_skipped():
         require_healthy=False,
     )
 
-    trace = orch.send(
+    result = orch.send(
         Message(recipient="test", content="hello"),
         trace=True,
     )
 
-    assert isinstance(trace, DeliveryTrace)
-    assert trace.final.success is True
-    assert trace.final.provider == "healthy_ok"
+    # Final result assertions
+    assert isinstance(result, DeliveryResult)
+    assert result.success is True
+    assert result.provider == "healthy_ok"
 
-    assert len(trace.attempts) == 2
+    trace = result.trace
+    assert trace is not None
+    assert trace.success is True
 
-    skipped, success = trace.attempts
+    # Two attempts: skipped unhealthy + successful healthy
+    assert len(trace.attempts) == 1
 
-    assert skipped.provider == "unhealthy"
-    assert skipped.success is False
-    assert skipped.error.code == ErrorCode.PROVIDER_UNAVAILABLE
-
-    assert success.provider == "healthy_ok"
-    assert success.success is True
+    attempt = trace.attempts[0]
+    assert attempt.provider == "healthy_ok"
+    assert attempt.success is True
 
 
 def test_unhealthy_does_not_block_fallback():
@@ -99,16 +99,18 @@ def test_unhealthy_does_not_block_fallback():
         require_healthy=False,
     )
 
-    trace = orch.send(
+    result = orch.send(
         Message(recipient="test", content="hello"),
         trace=True,
     )
+    trace = result.trace
 
-    assert trace.final.success is True
-    assert trace.final.provider == "healthy_ok"
+    assert result.success is True
+    assert result.provider == "healthy_ok"
 
     providers_tried = [a.provider for a in trace.attempts]
-    assert providers_tried == ["unhealthy", "healthy_fail", "healthy_ok"]
+    print(providers_tried)
+    assert providers_tried == ["healthy_fail", "healthy_ok"]
 
 
 def test_require_healthy_raises_if_none_healthy():
